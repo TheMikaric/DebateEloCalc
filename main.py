@@ -66,7 +66,7 @@ def generisi_parove_debatera(parovi_timova:list[tuple[str,str]],govornici_timovi
 def izracunaj_k_faktor(debater:tuple[float,int])->int:
     '''Funkcija vraća K-faktor za ELO rejting.
     K-faktor se menja u zavisnosti od iskustva debatera i njegovog rejtinga.'''
-    osnovni_k = 6
+    osnovni_k = 30
 
     if debater[0] > 1500:
         osnovni_k -= 2
@@ -96,18 +96,16 @@ def primeni_spiker_modifikator(debater:str, spikeri:dict[str, (str, list[int], f
     
     if debater not in spikeri:
         return 1.0  # Ako debater nije na listi spikera, vraćamo 1.0 (bez modifikacije)
-    
-    print(spikeri[debater][1])
-    print(spikeri[nadji_partnera(debater,spikeri)][1])
+
     delta_spikera = spikeri[debater][1][int(int(broj_runde)-1)] - spikeri[nadji_partnera(debater,spikeri)][1][int(int(broj_runde)-1)]  # Razlika između rezultata spikera i proseka
     
     if pobednik:
-        if 1 + (delta_spikera/10) > 0:
+        if (1+(delta_spikera/10)) < 2 :
             return 1 + (delta_spikera/10)  # Ako je pobednik, vraćamo modifikator koji povećava ELO rejting
         else: # Ako je pobednik ali je autspikovan za vise od 10, vracamo 0.1 jer ne zelimo da smanjujemo ELO za pobedu
-            return 0.1
+            return 2
     else:
-        if 1 - (delta_spikera/10) < 0:
+        if (1-(delta_spikera/10)) > 0:
             return 1-(delta_spikera/10)  # Ako je gubitnik, vraćamo modifikator koji smanjuje ELO rejting
         else: # Ako je pobednik ali je autspikovan za vise od 10, vracamo 0.1 jer ne zelimo da smanjujemo ELO za pobedu
             return -0.1
@@ -137,13 +135,14 @@ def preracunaj_elo(parovi_debatera:list[tuple[str,str]], elo_debateri:dict[str,(
             k_gubitnika = izracunaj_k_faktor(elo_debateri[gubitnik])
 
         delta_pobednika = 1 - (1 / (1 + 10 ** ((elo_gubitnika - elo_pobednika) / 400))) # Očekivani rezultat pobednika
-        delta_gubitnika = 0 - (1 / (1 + 10 ** ((elo_pobednika - elo_gubitnika) / 400)))
+        delta_gubitnika = 1 - (1 / (1 + 10 ** ((elo_pobednika - elo_gubitnika) / 400)))
         
         delta_pobednika *= k_pobednika*primeni_spiker_modifikator(pobednik,spikeri,True,br_runde)
         delta_gubitnika *= k_gubitnika*primeni_spiker_modifikator(gubitnik,spikeri,False,br_runde)
 
         novo_elo_pobednika = elo_pobednika + delta_pobednika
-        novo_elo_gubitnika = elo_gubitnika + delta_gubitnika
+        novo_elo_gubitnika = elo_gubitnika - delta_gubitnika
+        print(f'Stari elo: {delta_gubitnika}, novi elo: {delta_pobednika}')
         
         if pobednik in elo_debateri.keys():             
             novi_elo_debateri[pobednik]=(novo_elo_pobednika, elo_debateri[pobednik][1]+1) # Ažuriramo ELO rejting pobednika
