@@ -2,14 +2,15 @@ from operator import itemgetter # Za soritiranje liste listi po vrednosti u podl
 import copy # Za pravljenje kopije rečnika
 import csvio as csvio # Uvoz svih mojih funkcija iz csvio.py 
 import webio as webio # Uvoz svih mojih funkcija iz webio.py
-import time
+import datetime
+
+verzija = 10
 
 def generisi_parove_timova(timovi_rangovi:dict[str,int], debate_timovi:list[set[str]])->list[tuple[str,str]]:
     '''Generiše uređene parove timova na osnovu rangova.
     Primer od toga da je tim A prvi, B drugi, C treći i D četvrti:
     [A,B],[A,C],[A,D],[B,C],[B,D],[C,D]
     Prvi tim je pobedio drugi u svakom paru.'''
-
     parovi = []
     for debata in debate_timovi:
         rangovi = []
@@ -63,6 +64,7 @@ def generisi_parove_debatera(parovi_timova:list[tuple[str,str]],govornici_timovi
         parovi_debatera.append((pobednici_debateri[1], gubitnici_debateri[0]))
         
     return parovi_debatera
+
 def izracunaj_k_faktor(debater:tuple[float,int])->int:
     '''Funkcija vraća K-faktor za ELO rejting.
     K-faktor se menja u zavisnosti od iskustva debatera i njegovog rejtinga.'''
@@ -101,14 +103,19 @@ def primeni_spiker_modifikator(debater:str, spikeri:dict[str, (str, list[int], f
     
     if pobednik:
         if (1+(delta_spikera/10)) < 2 :
-            return 1 + (delta_spikera/10)  # Ako je pobednik, vraćamo modifikator koji povećava ELO rejting
-        else: # Ako je pobednik ali je autspikovan za vise od 10, vracamo 0.1 jer ne zelimo da smanjujemo ELO za pobedu
+            if (1+(delta_spikera/10)) > 0 :
+                return 1 + (delta_spikera/10)  # Ako je pobednik, vraćamo modifikator koji povećava ELO rejting
+            else: return 0.1
+        else: # Ako je pobednik ali je autspikovao za vise od 10, vracamo 2 jer ne zelimo da se precise poveca ELO
             return 2
     else:
-        if (1-(delta_spikera/10)) > 0:
-            return 1-(delta_spikera/10)  # Ako je gubitnik, vraćamo modifikator koji smanjuje ELO rejting
+        if 1+(delta_spikera/10) < 2:
+            if (1+(delta_spikera/10)) > 0 :
+                return 1 - (delta_spikera/10)  # Ako je gubitnik a autspikovao je vracamo manji faktor kako bi manje bio kaznjen
+            else:
+                return 2
         else: # Ako je pobednik ali je autspikovan za vise od 10, vracamo 0.1 jer ne zelimo da smanjujemo ELO za pobedu
-            return -0.1
+            return 0.1        
     
 def preracunaj_elo(parovi_debatera:list[tuple[str,str]], elo_debateri:dict[str,(float,int)],spikeri:dict[str, (str, list[int], float)], br_runde:int)->dict[str,(float,int)]:
     '''Funkcija računa novi ELO rejting na osnovu parova debatera.
@@ -142,7 +149,13 @@ def preracunaj_elo(parovi_debatera:list[tuple[str,str]], elo_debateri:dict[str,(
 
         novo_elo_pobednika = elo_pobednika + delta_pobednika
         novo_elo_gubitnika = elo_gubitnika - delta_gubitnika
-        print(f'Stari elo: {delta_gubitnika}, novi elo: {delta_pobednika}')
+        if delta_gubitnika <= 0 or delta_pobednika <= 0:
+            print(delta_pobednika)
+            print(delta_gubitnika)
+            print(pobednik)
+            print(gubitnik)
+            print(br_runde)
+            print(" ")
         
         if pobednik in elo_debateri.keys():             
             novi_elo_debateri[pobednik]=(novo_elo_pobednika, elo_debateri[pobednik][1]+1) # Ažuriramo ELO rejting pobednika
@@ -151,17 +164,26 @@ def preracunaj_elo(parovi_debatera:list[tuple[str,str]], elo_debateri:dict[str,(
     
     return novi_elo_debateri
 
-#webio.skini_ceo_turnir("https://wudc2022.calicotab.com/wudc",9)  # Primer kako koristiti funkciju za otvaranje veb stranice
-elo_debateri = csvio.ucitaj_elo_debatera("proba4pls.csv")
-csvio.dodaj_debatere(elo_debateri,'govornici.csv') # Dodaje debatere koji do sada nisu bili na ELO listi
-govornici_timovi = csvio.ucitaj_timove_ucesnike("govornici.csv")
-spikeri= csvio.uvezi_spikere("govornici.csv",broj_rundi=9)
+def unesi_turnir(url:str,broj_rundi:int=5,
+gov_fajl:str='govornici.csv',nov_elo_fajl:str='elo.csv')->None:
+    '''Unosi sve rezultate sa turnira na datom linku, od početka do kraja'''
+    verzija+=1
+    elo_debateri = csvio.ucitaj_elo_debatera(nov_elo_fajl)
+    webio.skini_ceo_turnir(url,broj_rundi)
+    csvio.dodaj_debatere(elo_debateri,gov_fajl) # Dodaje debatere koji do sada nisu bili na ELO listi
+    govornici_timovi = csvio.ucitaj_timove_ucesnike(gov_fajl,br_rundi=broj_rundi)
+    spikeri= csvio.uvezi_spikere(gov_fajl,broj_rundi=broj_rundi)
 
-for i in range(1,10):
-    print(i)
-    timovi_rangovi = csvio.ucitaj_rang_timova(f'timovi_rankovi_runda_{i}.csv')
-    debate_timovi = csvio.ucitaj_debate(f'timovi_debate_runda_{i}.csv')
-    parovi_timova = generisi_parove_timova(timovi_rangovi, debate_timovi)
-    parovi_debatera = generisi_parove_debatera(parovi_timova,govornici_timovi)
-    elo_debateri=preracunaj_elo(parovi_debatera, elo_debateri,spikeri,int(i))
-csvio.izvezi_elo_debatera(elo_debateri, "novi_elo.csv")
+    for i in range(1,broj_rundi+1):
+        timovi_rangovi = csvio.ucitaj_rang_timova(f'timovi_rankovi_runda_{i}.csv',alt_instit=True)
+        debate_timovi = csvio.ucitaj_debate(f'timovi_debate_runda_{i}.csv')
+        parovi_timova = generisi_parove_timova(timovi_rangovi, debate_timovi)
+        parovi_debatera = generisi_parove_debatera(parovi_timova,govornici_timovi)
+        print(parovi_debatera)
+        print(parovi_timova)
+        elo_debateri=preracunaj_elo(parovi_debatera, elo_debateri,spikeri,i)
+    csvio.izvezi_elo_debatera(elo_debateri, nov_elo_fajl)
+    csvio.izvezi_elo_debatera(elo_debateri, f'nov_elo_fajl {verzija}.csv')
+
+unesi_turnir('https://kampkusici2021.calicotab.com/kusici2021',broj_rundi=4)\
+unesi_turnir('https://decembarac2021.calicotab.com/decembarac2021/',broj_rundi=5)

@@ -40,6 +40,8 @@ def skini_ceo_turnir(url:str,br_rundi:int=5):
     driver = webdriver.Chrome()
     timovi_rankovi = []
     timovi_debate = []
+    if url.endswith('/'):
+        url = url[:-1] # Da program radi i kad se URL zavrsava sa crtom i kad se ne zavrsava
     govornici = ucitaj_govornike_tekst(driver,url)
     for i in range(1, br_rundi+1):
         timovi_rankovi = ucitaj_timove_rankove_tekst(driver,url,str(i))

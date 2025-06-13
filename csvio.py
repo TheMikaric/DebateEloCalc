@@ -34,7 +34,7 @@ def ocisti_ime(ime:str)->str:
     ime = re.sub(r' .+? ', ' ', ime) # Uklanja sve između imena i prezimena
     return ime
 
-def ucitaj_timove_ucesnike(ime_datoteke:str,spiker_csv_mod:bool=False,ignorisi_1:bool=True)->dict[str,str]:
+def ucitaj_timove_ucesnike(ime_datoteke:str,spiker_csv_mod:bool=False,ignorisi_1:bool=True,br_rundi:int=5)->dict[str,str]:
     '''Funkcija učitava imena timova i njegovih učesnika iz datoteke.
    Vraća rečnik čiji su ključevi "očišćena" imena debatera, a vrednosti izvorna imena timova.'''
     govornici_timovi = {}
@@ -42,15 +42,16 @@ def ucitaj_timove_ucesnike(ime_datoteke:str,spiker_csv_mod:bool=False,ignorisi_1
     with open(ime_datoteke, newline='\n', encoding='utf-8') as csvdat:
         citac = csv.reader(csvdat, delimiter='\t') # delimeter='\t' usled toga što je tab podrazumevani delilac kad se kopira sa Taba
         for red in citac:
+            if len(red) == br_rundi+6:
+                spiker_csv_mod=True
             if ignorisi_1==False or prvi_red==False:
                 if spiker_csv_mod:
                     ime_ucesnika = ocisti_ime(red[1])
-                    govornici_timovi[ime_ucesnika]=red
+                    govornici_timovi[ime_ucesnika]=red[2]
                 else:
                     ime_ucesnika = ocisti_ime(red[1])
                     govornici_timovi[ime_ucesnika]=red[3]
             prvi_red=False
-    #print(f'????{govornici_timovi}????')
     return govornici_timovi
 
 def ucitaj_rang_timova(ime_datoteke:str,ignorisi_1:bool=True,alt_instit:bool=False)->dict[str,int]:
@@ -116,9 +117,10 @@ def uvezi_spikere(ime_datoteke:str,broj_rundi:int=5,ignorisi_1:bool=True)->dict[
         for red in citac:
             if prvi_red==False or ignorisi_1==False:    
                 try:
-                    prosek = float(red[10])
+                    prosek = float(red[broj_rundi+4])
                 except ValueError:
                     prosek = 0.0
+
                 lista = []
                 for i in range(4, 4+broj_rundi):
                     try:
